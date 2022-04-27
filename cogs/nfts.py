@@ -8,6 +8,8 @@ from bs4 import BeautifulSoup
 from random_user_agent.user_agent import UserAgent
 from random_user_agent.params import SoftwareName, OperatingSystem
 from web3 import Web3
+import csv
+import pandas as pd
 
 error = c.red()
 affirm = c.green()
@@ -37,11 +39,54 @@ user_agent_rotator = UserAgent(software_names=software_names, operating_systems=
 #web3 client
 w3 = Web3(Web3.HTTPProvider(f'{quickNodeEndpoint}'))
 
+#NFT commands
+nftCommands = {
+  'seaScrape':'Scrapes a collections statistics on OpenSea.',
+  'ethStats <unit>':'Returns ETH price and gas price in gwei/eth.',
+  'createInvDatabase':'Creates a serverside database for user to store NFT investments.',
+  'logInvestment <txHash>':'logs an NFT investment into the user\'s database.' 
+}
+
 def gweiToEth(gwei):
   return gwei*0.000000001
 
 def weiToEth(wei):
   return wei/1000000000000000000
+
+def getTotalTransactionCost(tx):
+  transactionData = w3.eth.get_transaction(tx)
+  transactionReceiptData = w3.eth.get_transaction_receipt(tx)
+  price = w3.fromWei(int(transactionData['value']), 'ether')
+  gasUsed = int(transactionReceiptData['gasUsed'])
+  gasPrice = int(transactionReceiptData['effectiveGasPrice'])
+  transactionFee = weiToEth(gasPrice*gasUsed)
+  cutTransactionFee=round(transactionFee, 5)
+  totalTransactionCost = float(price)+float(cutTransactionFee)
+  return(totalTransactionCost)
+
+def checkUserInvList(id, pathToUserList):
+    users = []
+    userHasSKUList = False
+
+    with open(pathToUserList, 'r') as userList:
+        for row in userList:
+            users.append(row)
+        for user in users:
+            if str(id) in user:
+                userHasSKUList = True
+    userList.close()
+
+    if userHasSKUList:
+        return True
+    else:
+        return False
+
+def checkTxInDatabase(tx, path_to_user_list):
+  print('hi')
+  data = pd.read_csv(path_to_user_list)
+  transactions = data['txHash'].toList()
+  if tx in transactions:
+    return True
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):
     #initiating the error embed
@@ -65,68 +110,137 @@ class nfts(commands.Cog):
     self.client = client
 
   @commands.command()
+  async def nftHelp(self,ctx):
+    helpEmbed = nextcord.Embed(title = 'NFT Help!', description = 'Commands in the NFT cog:')
+    for command in nftCommands:
+      helpEmbed.add_field(name = f'`*{command}`:', value=f'{nftCommands[command]}')
+    helpEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+    helpEmbed.set_thumbnail(url=footerUrl)
+    
+    await ctx.send(embed=helpEmbed)
+
+  @commands.command()
+  async def createInvDatabase(self, ctx):
+    author = ctx.author.name
+    id = ctx.author.id
+    path_to_file = f'./NFTInvestments/{id}.csv'
+    path_to_users = './NFTInvestments/investmentUsers.csv'
+    userHasList = checkUserInvList(id, path_to_users)
+    if not userHasList:
+        with open(path_to_users, 'a') as userLog:
+            writer = csv.writer(userLog)
+            writer.writerow([f'{id}'])
+        userLog.close()
+      
+        with open(path_to_file, 'w') as newUserInvList:
+            writer = csv.writer(newUserInvList)
+            headerRow=['txHash','nftName','totalCost','price','floorAtLogging','contract']
+            writer.writerow(headerRow)
+        newUserInvList.close()
+      
+        affirmEmbed = nextcord.Embed(
+            title=f'Database Created for user: `{author}`',
+            description='Run `*logInvestment` to start building your investment list!',
+            color=affirm)
+        affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+        await ctx.channel.send(embed=affirmEmbed)
+    else:
+        await sendErrorMessage(ctx, f'{author}\'s database already exists!')
+  
+  @commands.command()
   async def logInvestment(self, ctx, txHash):
     author = ctx.author
     id = author.id
     userPFP = author.avatar.url
+    path_to_users = './NFTInvestments/investmentUsers.csv'
+
+    userList = checkUserInvList(id, path_to_users)
+
+    if userList:
+      path_to_user_list = f'./NFTInvestments/{id}.csv'
+      #creating user agent so our scrape doesn't get blocked
+      user_agent = user_agent_rotator.get_random_user_agent()
+  
+      #this is the base link for querying a transaction by txhash
+      etherscanLink = f"https://etherscan.io/tx/{txHash}"
+  
+      #get requesting the page using the random user agent
+      request = requests.get(etherscanLink, headers={'User-Agent':f'{user_agent}'})
+  
+      #want to ensure we are not banned, so we won't proceed with any kind of analysis if our request doesnt go thru
+      if request.status_code == 200:
+        #initialize BS4 to analyze etherscan trans page
+        soup = BeautifulSoup(request.text, features="html5lib")
+
+        #find title of NFT collection
+        titleSpan = soup.find('span',{'class':'hash-tag text-truncate mr-1'})
+        title = titleSpan['title']
+
+        #find transaction type
+        transactionTypeSpan = soup.find('span',{'class':'mr-1 d-inline-block'})
+        transactionTypeWhole = transactionTypeSpan.text
+        if 'Mint' in transactionTypeWhole:
+          transactionType='**Mint** :white_check_mark:'
+        elif 'Transfer' in transactionTypeWhole:
+          transactionType='**Transfer** :left_right_arrow:'
+
+        #find the original contract of the NFT
+        tokenClass = soup.find('a',{'class':'mr-1 d-inline-block'})
+        etherscanContractPath = tokenClass['href']
+        etherscanContractPathSplit = etherscanContractPath.split('/')
+        contract = etherscanContractPathSplit[-1]
+
+        #find the identifier tag of the NFT (e.g. #2907)
+        identifierSpan = soup.find('span',{'class':'hash-tag text-truncate'})
+        identifierLink = identifierSpan.find('a').attrs['href']
+        identifierSplit = identifierLink.split('=')
+        identifier = identifierSplit[-1]
+
+        nftTitle = f'{title}#{identifier}'
+
+        #these are used to get stats of single asset and contract to harvest slug -> get stats
+        openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
+        openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
+
+        #unusable until API key is delivered
+        openSeaAssetData = requests.get(openSeaAssetLink, headers={'X-API-KEY':f'{osAPIkey}'})
+        openSeaContractData = requests.get(openSeaContractLink, headers={'X-API-KEY':f'{osAPIkey}'})
+        floorAtLogging = 'N/A'
+
+        #Web3 Section:
+        
+        #Get price of acquisition
+        transactionData = w3.eth.get_transaction(txHash)
+        price = w3.fromWei(int(transactionData['value']), 'ether')
+
+        #Get total cost of acquisition
+        cost = getTotalTransactionCost(txHash)
+
+        investment = [txHash, nftTitle, cost, price, floorAtLogging, contract]
+
+        txInList = False
+        investmentData = pd.read_csv(path_to_user_list)
+        txList = investmentData.txHash.tolist()
+        for tx in txList:
+          if txHash in tx:
+            txInList=True
+
+        if not txInList:
+          with open(path_to_user_list, 'a') as userList:
+            writer = csv.writer(userList)
+            writer.writerow(investment)
+          userList.close()
+
+        #Build embed to relay information.
+          transactionEmbed = nextcord.Embed(title=f'NFT Investment: `{nftTitle}`', description = f'Logging new investment for user: `{author}`', color = affirm)
+          transactionEmbed.add_field(name=f'Transaction type: {transactionType}', value = f'Origin Contract: `{contract}`', inline=False)
+          transactionEmbed.add_field(name='Price:', value=f'`{price}` **Ξ**', inline=True)
+          transactionEmbed.add_field(name='Total Cost:', value=f'`{cost}` **Ξ**')
+          transactionEmbed.add_field(name='Current Floor (OS):', value=f'`not implemented`', inline=True)
+          transactionEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+          transactionEmbed.set_thumbnail(url=userPFP)
     
-    #creating user agent so our scrape doesn't get blocked
-    user_agent = user_agent_rotator.get_random_user_agent()
-
-    #this is the base link for querying a transaction by txhash
-    etherscanLink = f"https://etherscan.io/tx/{txHash}"
-
-    #get requesting the page using the random user agent
-    request = requests.get(etherscanLink, headers={'User-Agent':f'{user_agent}'})
-
-    #want to ensure we are not banned, so we won't proceed with any kind of analysis if our request doesnt go thru
-    if request.status_code == 200:
-      soup = BeautifulSoup(request.text, features="html5lib")
-      
-      titleSpan = soup.find('span',{'class':'hash-tag text-truncate mr-1'})
-      title = titleSpan['title']
-      
-      transactionTypeSpan = soup.find('span',{'class':'mr-1 d-inline-block'})
-      transactionTypeWhole = transactionTypeSpan.text
-      if 'Mint' in transactionTypeWhole:
-        transactionType='**Mint** :white_check_mark:'
-        transactionTypeString='Mint'
-      elif 'Transfer' in transactionTypeWhole:
-        transactionType='**Transfer** :left_right_arrow:'
-        transactionTypeString='Transfer'
-
-      tokenClass = soup.find('a',{'class':'mr-1 d-inline-block'})
-      etherscanContractPath = tokenClass['href']
-      etherscanContractPathSplit = etherscanContractPath.split('/')
-      contract = etherscanContractPathSplit[-1]
-
-      identifierSpan = soup.find('span',{'class':'hash-tag text-truncate'})
-      identifierLink = identifierSpan.find('a').attrs['href']
-      identifierSplit = identifierLink.split('=')
-      identifier = identifierSplit[-1]
-      
-      openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
-      openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
-
-      openSeaAssetData = requests.get(openSeaAssetLink, headers={'X-API-KEY':f'{osAPIkey}'})
-      openSeaContractData = requests.get(openSeaContractLink, headers={'X-API-KEY':f'{osAPIkey}'})
-      print(openSeaAssetData.text)
-      print(openSeaContractData.text)
-
-      #I can no longer continue work without an OpenSea API key.
-      transactionData = w3.eth.get_transaction(txHash)
-      price = w3.fromWei(int(transactionData['value']), 'ether')
-
-      print(price)
-      
-      transactionEmbed = nextcord.Embed(title=f'NFT Investment: `{title}#{identifier}`', description = f'Logging new investment for user: `{author}`', color = affirm)
-      transactionEmbed.add_field(name=f'Transaction type: {transactionType}', value = f'Origin Contract: `{contract}`', inline=False)
-      transactionEmbed.add_field(name='Price:', value=f'`{price} Ethereum`', inline=True)
-      transactionEmbed.add_field(name='Current Floor:', value=f'`not implemented`', inline=True)
-      transactionEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
-      transactionEmbed.set_thumbnail(url=userPFP)
-
-      await ctx.send(embed=transactionEmbed)
+          await ctx.send(embed=transactionEmbed)
        
   
   @commands.command()

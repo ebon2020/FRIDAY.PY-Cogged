@@ -80,7 +80,7 @@ class footsites(commands.Cog):
           affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
           await ctx.channel.send(embed=affirmEmbed)
       else:
-          await sendErrorMessage(ctx, f'{author}\'s userbase already exists!')
+          await sendErrorMessage(ctx, f'{author}\'s database already exists!')
   
   
   #This is the command to add a specific footsite SKU to a user's database
