@@ -15,6 +15,8 @@ blue = c.blue()
 
 etherscanAPIkey = os.environ['etherscan_api_key']
 
+osAPIkey = os.environ['os_api_key']
+
 #keeping track of version number
 version = os.environ['Version']
 
@@ -76,8 +78,6 @@ class nfts(commands.Cog):
       transactionTypeSpan = soup.find('span',{'class':'mr-1 d-inline-block'})
       transactionType = transactionTypeSpan.text
       
-      mediaBodySpan = soup.find('div',{'class':'media-body'})
-      image = f"https://etherscan.io{mediaBodySpan.find('img').attrs['src']}"
       
       tokenClass = soup.find('a',{'class':'mr-1 d-inline-block'})
       etherscanContractPath = tokenClass['href']
@@ -88,10 +88,15 @@ class nfts(commands.Cog):
       identifierLink = identifierSpan.find('a').attrs['href']
       identifierSplit = identifierLink.split('=')
       identifier = identifierSplit[-1]
-      print(identifier)
+      
+      openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
 
+      openSeaAssetData = requests.get(openSeaAssetLink, headers={'X-API-KEY':f'{osAPIkey}'})
+      print(openSeaAssetData.text)
+
+      #I can no longer continue work without an OpenSea API key.
+      
       transactionEmbed = nextcord.Embed(title='NFT Investment!', description = f'Logging new investment for user: `{author}`', color = affirm)
-      transactionEmbed.set_thumbnail(url=image)
       transactionEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
 
       await ctx.send(embed=transactionEmbed)
