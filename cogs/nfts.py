@@ -5,17 +5,22 @@ from nextcord import Color as c
 import requests
 import json
 from bs4 import BeautifulSoup
-from urllib.request import Request, urlopen
 from random_user_agent.user_agent import UserAgent
 from random_user_agent.params import SoftwareName, OperatingSystem
+from web3 import Web3
 
 error = c.red()
 affirm = c.green()
 blue = c.blue()
 
+#secret EtherScan key
 etherscanAPIkey = os.environ['etherscan_api_key']
 
+#secret OpenSea key
 osAPIkey = os.environ['os_api_key']
+
+#secret quickNode endpoint
+quickNodeEndpoint = os.environ['quickNode Endpoint']
 
 #keeping track of version number
 version = os.environ['Version']
@@ -24,14 +29,19 @@ version = os.environ['Version']
 webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550 | NFTs'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
 
+#user agents for requests
 software_names = [SoftwareName.CHROME.value]
 operating_systems = [OperatingSystem.WINDOWS.value, OperatingSystem.LINUX.value]   
-
 user_agent_rotator = UserAgent(software_names=software_names, operating_systems=operating_systems, limit=100)
 
+#web3 client
+w3 = Web3(Web3.HTTPProvider(f'{quickNodeEndpoint}'))
 
 def gweiToEth(gwei):
-  return gwei*0.000000000862
+  return gwei*0.000000001
+
+def weiToEth(wei):
+  return wei/1000000000000000000
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):
     #initiating the error embed
@@ -58,6 +68,7 @@ class nfts(commands.Cog):
   async def logInvestment(self, ctx, txHash):
     author = ctx.author
     id = author.id
+    userPFP = author.avatar.url
     
     #creating user agent so our scrape doesn't get blocked
     user_agent = user_agent_rotator.get_random_user_agent()
@@ -76,9 +87,14 @@ class nfts(commands.Cog):
       title = titleSpan['title']
       
       transactionTypeSpan = soup.find('span',{'class':'mr-1 d-inline-block'})
-      transactionType = transactionTypeSpan.text
-      
-      
+      transactionTypeWhole = transactionTypeSpan.text
+      if 'Mint' in transactionTypeWhole:
+        transactionType='**Mint** :white_check_mark:'
+        transactionTypeString='Mint'
+      elif 'Transfer' in transactionTypeWhole:
+        transactionType='**Transfer** :left_right_arrow:'
+        transactionTypeString='Transfer'
+
       tokenClass = soup.find('a',{'class':'mr-1 d-inline-block'})
       etherscanContractPath = tokenClass['href']
       etherscanContractPathSplit = etherscanContractPath.split('/')
@@ -90,20 +106,28 @@ class nfts(commands.Cog):
       identifier = identifierSplit[-1]
       
       openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
+      openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
 
       openSeaAssetData = requests.get(openSeaAssetLink, headers={'X-API-KEY':f'{osAPIkey}'})
+      openSeaContractData = requests.get(openSeaContractLink, headers={'X-API-KEY':f'{osAPIkey}'})
       print(openSeaAssetData.text)
+      print(openSeaContractData.text)
 
       #I can no longer continue work without an OpenSea API key.
+      transactionData = w3.eth.get_transaction(txHash)
+      price = w3.fromWei(int(transactionData['value']), 'ether')
+
+      print(price)
       
-      transactionEmbed = nextcord.Embed(title='NFT Investment!', description = f'Logging new investment for user: `{author}`', color = affirm)
+      transactionEmbed = nextcord.Embed(title=f'NFT Investment: `{title}#{identifier}`', description = f'Logging new investment for user: `{author}`', color = affirm)
+      transactionEmbed.add_field(name=f'Transaction type: {transactionType}', value = f'Origin Contract: `{contract}`', inline=False)
+      transactionEmbed.add_field(name='Price:', value=f'`{price} Ethereum`', inline=True)
+      transactionEmbed.add_field(name='Current Floor:', value=f'`not implemented`', inline=True)
       transactionEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+      transactionEmbed.set_thumbnail(url=userPFP)
 
       await ctx.send(embed=transactionEmbed)
-      
-      
-
-      
+       
   
   @commands.command()
   async def ethStats(self, ctx, ethVGwei = None):
