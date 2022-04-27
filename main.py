@@ -12,7 +12,7 @@ affirm = c.green()
 blue = c.blue()
 
 #keeping track of version number
-version = '1.2.0'
+version = os.environ['Version']
 
 #credits, version number and bot Icon
 webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550'
@@ -40,7 +40,16 @@ orders = {
     'shopScrape':
     'Have FRIDAY scrape the variants of a given product link by using `*shopScrape <link>`',
     'seaScrape':
-    'Have FRIDAY scrape the useful stats about any collection on OpenSea.'
+    'Have FRIDAY scrape the useful stats about any collection on OpenSea.',
+    'ethStats':
+    'Gather quick statistics about the Ethereum blockchain (gas prices, eth->USD) by using `*ethStats <gas unit>`'
+}
+
+cogs = {
+  'footsites':True, 
+  'nfts':True, 
+  'shopify':True, 
+  'snkrs':True
 }
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):
@@ -64,9 +73,9 @@ async def sendErrorMessage(ctx, message, command_needed=False, command=None):
 async def on_ready():
     print('FRIDAY online!')
 
-for fn in os.listdir('./cogs'):
-  if fn.endswith(',py'):
-    client.load_extension(f"cogs.{fn[:-3]}")
+    for fn in os.listdir('./cogs'):
+      if fn.endswith('.py'):
+        client.load_extension(f"cogs.{fn[:-3]}")
 
 @client.command()
 async def FRIDAYhelp(ctx):
@@ -86,12 +95,19 @@ async def FRIDAYhelp(ctx):
     await ctx.channel.send(embed=helpEmbed)
 
 @client.command()
-async def loadCog(ctx, extension):
-  client.load_extension(f'cogs.{extension}')
-  affirmEmbed = nextcord.Embed(title=f'Success!', description = f'`{extension}` cog loaded into FRIDAY.PY', color = affirm)
-  affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
-  affirmEmbed.set_thumbnail(url=footerUrl)
-  await ctx.send(embed=affirmEmbed)
+async def loadCog(ctx, extension = None):
+  if extension==None:
+    await sendErrorMessage(ctx, 'No cog provided.')
+  
+  else:  
+    client.load_extension(f'cogs.{extension}')
+  
+    cogs[f'{extension}'] = True
+    
+    affirmEmbed = nextcord.Embed(title=f'Success!', description = f'`{extension}` cog loaded into FRIDAY.PY', color = affirm)
+    affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+    affirmEmbed.set_thumbnail(url=footerUrl)
+    await ctx.send(embed=affirmEmbed)
 
 @loadCog.error
 async def loadCog_error(ctx, error):
@@ -101,7 +117,10 @@ async def loadCog_error(ctx, error):
 @client.command()
 async def unloadCog(ctx, extension):
   client.unload_extension(f'cogs.{extension}')
-  affirmEmbed = nextcord.Embed(title=f'Success!', description = f'`{extension}` cog unloaded from FRIDAY.PY', color = affirm)
+
+  cogs[f'{extension}'] = False
+  
+  affirmEmbed = nextcord.Embed(title=f'Success!', description = f'`{extension}` cog unloaded from FRIDAY.PY', color = error)
   affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
   affirmEmbed.set_thumbnail(url=footerUrl)
   await ctx.send(embed=affirmEmbed)
@@ -114,7 +133,7 @@ async def unloadCog_error(ctx, error):
 @client.command()
 async def reloadCog(ctx, extension):
   client.reload_extension(f'cogs.{extension}')
-  affirmEmbed = nextcord.Embed(title=f'Success!', description = f'`{extension}` cog reloaded into FRIDAY.PY', color = affirm)
+  affirmEmbed = nextcord.Embed(title=f'Success!', description = f'`{extension}` cog reloaded into FRIDAY.PY', color = blue)
   affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
   affirmEmbed.set_thumbnail(url=footerUrl)
   await ctx.send(embed=affirmEmbed)
@@ -123,5 +142,17 @@ async def reloadCog(ctx, extension):
 async def reloadCog_error(ctx, error):
   if isinstance(error, commands.CommandInvokeError):
     await sendErrorMessage(ctx, f'{error}')
+
+@client.command()
+async def loaded(ctx):
+  printString = ''
+  for key in cogs:
+    printString += f'{key}: {cogs[key]}\n'
+
+  infoEmbed = nextcord.Embed(title = 'FRIDAY Cogs:', description = 'What cogs are loaded into FRIDAY right now?', color = blue)
+  infoEmbed.add_field(name = 'Cogs:', value = f'```{printString}```')
+  infoEmbed.set_thumbnail(url = footerUrl)
+  infoEmbed.set_footer(text = webhookFooter, icon_url = footerUrl)
+  await ctx.send(embed=infoEmbed)
 
 client.run(my_secret)

@@ -1,3 +1,4 @@
+import os
 import nextcord
 from nextcord.ext import commands
 from nextcord import Color as c
@@ -10,10 +11,10 @@ affirm = c.green()
 blue = c.blue()
 
 #keeping track of version number
-version = '1.2.0'
+version = os.environ['Version']
 
 #credits, version number and bot Icon
-webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550'
+webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550 | Footsites'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
 
 def checkUserSKUList(id, pathToUserList):
