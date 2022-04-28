@@ -44,7 +44,8 @@ nftCommands = {
   'seaScrape':'Scrapes a collections statistics on OpenSea.',
   'ethStats <unit>':'Returns ETH price and gas price in gwei/eth.',
   'createInvDatabase':'Creates a serverside database for user to store NFT investments.',
-  'logInvestment <txHash>':'logs an NFT investment into the user\'s database.' 
+  'logInvestment <txHash>':'Logs an NFT investment into the user\'s database.',
+  'logSale <txHash>':'Logs an NFT sale, removing NFT from database and logging profits.'
 }
 
 #gwei to Eth conversion for Values from web3 api
@@ -116,10 +117,10 @@ class nfts(commands.Cog):
     self.client = client
 
   @commands.command()
-  async def nftHelp(self,ctx):
+  async def nftsHelp(self,ctx):
     helpEmbed = nextcord.Embed(title = 'NFT Help!', description = 'Commands in the NFT cog:')
     for command in nftCommands:
-      helpEmbed.add_field(name = f'`*{command}`:', value=f'{nftCommands[command]}')
+      helpEmbed.add_field(name = f'`*{command}`', value=f'{nftCommands[command]}')
     helpEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
     helpEmbed.set_thumbnail(url=footerUrl)
     
@@ -140,7 +141,7 @@ class nfts(commands.Cog):
       
         with open(path_to_file, 'w') as newUserInvList:
             writer = csv.writer(newUserInvList)
-            headerRow=['txHash','nftName','totalCost','price','floorAtLogging','contract', 'uniqueContractIdentifierID']
+            headerRow=['txHash','nftName','slug','totalCost','price','floorAtLogging','contract', 'uniqueContractIdentifierID']
             writer.writerow(headerRow)
         newUserInvList.close()
       
@@ -216,6 +217,7 @@ class nfts(commands.Cog):
           #unusable until API key is delivered
           openSeaAssetData = requests.get(openSeaAssetLink, headers={'X-API-KEY':f'{osAPIkey}'})
           openSeaContractData = requests.get(openSeaContractLink, headers={'X-API-KEY':f'{osAPIkey}'})
+          slug = 'N/A'
           floorAtLogging = 'N/A'
   
           #Web3 Section:
@@ -227,7 +229,7 @@ class nfts(commands.Cog):
           #Get total cost of acquisition
           cost = getTotalTransactionCost(txHash)
   
-          investment = [txHash, nftTitle, cost, price, floorAtLogging, contract, uniqueContractIdentifierID]
+          investment = [txHash, nftTitle, slug, cost, price, floorAtLogging, contract, uniqueContractIdentifierID]
           
           with open(path_to_user_list, 'a') as userList:
             writer = csv.writer(userList)
@@ -294,10 +296,10 @@ class nfts(commands.Cog):
               collectionStats = json.loads(collectionData.text)
               floorPrice = collectionStats['stats']['floor_price']
               oneDaySales = int(collectionStats['stats']['one_day_sales'])
-              oneDayVolume = float(collectionStats['stats']['one_day_volume'])
+              oneDayVolume = round(float(collectionStats['stats']['one_day_volume']),4)
               totalSupply = int(collectionStats['stats']['total_supply'])
               totalOwners = int(collectionStats['stats']['num_owners'])
-              averagePrice = float(collectionStats['stats']['average_price'])
+              averagePrice = round(float(collectionStats['stats']['average_price']),4)
   
               collectionText = json.loads(collectionImageReq.text)
               for entry in collectionText['collection'][

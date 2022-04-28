@@ -18,6 +18,13 @@
 1.2 Updates:
   - Reached all goals for 1.1 version (OpenSea API interactions, better file structure, more extensive commenting...)
   - Added cog implementation (run *loadCog, *unloadCog, and *reloagCog to manage loaded features). This means I can make changes and edits to the code without having to restart the bot, instead I can simply refresh the cog.
+
+1.3 Updates:
+  - Added NFT investment logging + creation of user databases.
+
+1.3.1 Updates:
+  - added safeguards against duplication of investments and database files.
+  - added credits.
 ---------
-1.3 Targets:
-  - implement a new NFT buy-in/current floor analyzer - in essence summarizing the current progress of your buy in of a certain collection.
+1.4 Targets:
+  - implement a NFT collection floor monitor, which adds new floors to monitor with stored investments.

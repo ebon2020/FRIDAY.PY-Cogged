@@ -17,6 +17,14 @@ version = os.environ['Version']
 webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550 | Footsites'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
 
+footsCommands = {
+  'createSKUList':'Creates a serverside SKU list for the user.',
+  'addSKU <sku>':'Adds a SKU to the user\'s serverside SKU list.',
+  'delSKU <sku>':'Deletes a SKU from the user\' serverside SKU list.',
+  'infoSKU <sku>':'Gathers info about a footsite SKU.',
+  'listSKU <sku>':'Lists out a user\'s SKU list, add `True` to have it DM\'ed to you.'
+}
+
 def checkUserSKUList(id, pathToUserList):
     users = []
     userHasSKUList = False
@@ -55,6 +63,16 @@ class footsites(commands.Cog):
   def __init__(self, client):
     self.client = client
 
+  @commands.command()
+  async def footsitesHelp(self,ctx):
+    helpEmbed = nextcord.Embed(title = 'Footsite Help!', description = 'Commands in the Footsite cog:')
+    for command in footsCommands:
+      helpEmbed.add_field(name = f'`*{command}`', value=f'{footsCommands[command]}')
+    helpEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+    helpEmbed.set_thumbnail(url=footerUrl)
+    
+    await ctx.send(embed=helpEmbed)
+  
   @commands.command()
   async def createSKUList(self, ctx):
       author = ctx.author.name

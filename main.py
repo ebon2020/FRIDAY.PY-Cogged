@@ -170,6 +170,21 @@ async def loaded(ctx):
     infoEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
     await ctx.send(embed=infoEmbed)
 
+@client.command()
+async def credits(ctx):
+  creditsEmbed = nextcord.Embed(
+      title=':heart: Credits :heart:',
+      url='https://github.com/ebon2020/FRIDAY.PY-Cogged',
+      description='Coded with love by ebon#7550',
+  )
+  creditsEmbed.add_field(name='Github:',value='[click here](https://github.com/ebon2020)', inline=True)
+  creditsEmbed.add_field(name='Twitter:', value='[click here](https://twitter.com/ebon0001)', inline=True)
+  creditsEmbed.add_field(name='Instagram:', value='[click here](https://www.instagram.com/ebon2020)', inline=True)
+
+  creditsEmbed.set_thumbnail(url=footerUrl)
+  creditsEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+
+  await ctx.send(embed=creditsEmbed)
 
 @client.event
 async def on_command_error(ctx, error):
