@@ -82,11 +82,12 @@ def checkUserInvList(id, pathToUserList):
         return False
 
 def checkTxInDatabase(tx, path_to_user_list):
-  print('hi')
-  data = pd.read_csv(path_to_user_list)
-  transactions = data['txHash'].toList()
-  if tx in transactions:
-    return True
+  investmentData = pd.read_csv(path_to_user_list)
+  txList = investmentData.txHash.tolist()
+  for transaction in txList:
+    if tx in transaction:
+      return True
+  return False
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):
     #initiating the error embed
@@ -166,66 +167,61 @@ class nfts(commands.Cog):
   
       #get requesting the page using the random user agent
       request = requests.get(etherscanLink, headers={'User-Agent':f'{user_agent}'})
+
+      txInList = checkTxInDatabase(txHash, path_to_user_list)
+
+      if not txInList:
+        #want to ensure we are not banned, so we won't proceed with any kind of analysis if our request doesnt go thru
+        if request.status_code == 200:
+          #initialize BS4 to analyze etherscan trans page
+          soup = BeautifulSoup(request.text, features="html5lib")
   
-      #want to ensure we are not banned, so we won't proceed with any kind of analysis if our request doesnt go thru
-      if request.status_code == 200:
-        #initialize BS4 to analyze etherscan trans page
-        soup = BeautifulSoup(request.text, features="html5lib")
-
-        #find title of NFT collection
-        titleSpan = soup.find('span',{'class':'hash-tag text-truncate mr-1'})
-        title = titleSpan['title']
-
-        #find transaction type
-        transactionTypeSpan = soup.find('span',{'class':'mr-1 d-inline-block'})
-        transactionTypeWhole = transactionTypeSpan.text
-        if 'Mint' in transactionTypeWhole:
-          transactionType='**Mint** :white_check_mark:'
-        elif 'Transfer' in transactionTypeWhole:
-          transactionType='**Transfer** :left_right_arrow:'
-
-        #find the original contract of the NFT
-        tokenClass = soup.find('a',{'class':'mr-1 d-inline-block'})
-        etherscanContractPath = tokenClass['href']
-        etherscanContractPathSplit = etherscanContractPath.split('/')
-        contract = etherscanContractPathSplit[-1]
-
-        #find the identifier tag of the NFT (e.g. #2907)
-        identifierSpan = soup.find('span',{'class':'hash-tag text-truncate'})
-        identifierLink = identifierSpan.find('a').attrs['href']
-        identifierSplit = identifierLink.split('=')
-        identifier = identifierSplit[-1]
-
-        nftTitle = f'{title}#{identifier}'
-
-        #these are used to get stats of single asset and contract to harvest slug -> get stats
-        openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
-        openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
-
-        #unusable until API key is delivered
-        openSeaAssetData = requests.get(openSeaAssetLink, headers={'X-API-KEY':f'{osAPIkey}'})
-        openSeaContractData = requests.get(openSeaContractLink, headers={'X-API-KEY':f'{osAPIkey}'})
-        floorAtLogging = 'N/A'
-
-        #Web3 Section:
-        
-        #Get price of acquisition
-        transactionData = w3.eth.get_transaction(txHash)
-        price = w3.fromWei(int(transactionData['value']), 'ether')
-
-        #Get total cost of acquisition
-        cost = getTotalTransactionCost(txHash)
-
-        investment = [txHash, nftTitle, cost, price, floorAtLogging, contract]
-
-        txInList = False
-        investmentData = pd.read_csv(path_to_user_list)
-        txList = investmentData.txHash.tolist()
-        for tx in txList:
-          if txHash in tx:
-            txInList=True
-
-        if not txInList:
+          #find title of NFT collection
+          titleSpan = soup.find('span',{'class':'hash-tag text-truncate mr-1'})
+          title = titleSpan['title']
+  
+          #find transaction type
+          transactionTypeSpan = soup.find('span',{'class':'mr-1 d-inline-block'})
+          transactionTypeWhole = transactionTypeSpan.text
+          if 'Mint' in transactionTypeWhole:
+            transactionType='**Mint** :white_check_mark:'
+          elif 'Transfer' in transactionTypeWhole:
+            transactionType='**Transfer** :left_right_arrow:'
+  
+          #find the original contract of the NFT
+          tokenClass = soup.find('a',{'class':'mr-1 d-inline-block'})
+          etherscanContractPath = tokenClass['href']
+          etherscanContractPathSplit = etherscanContractPath.split('/')
+          contract = etherscanContractPathSplit[-1]
+  
+          #find the identifier tag of the NFT (e.g. #2907)
+          identifierSpan = soup.find('span',{'class':'hash-tag text-truncate'})
+          identifierLink = identifierSpan.find('a').attrs['href']
+          identifierSplit = identifierLink.split('=')
+          identifier = identifierSplit[-1]
+  
+          nftTitle = f'{title}#{identifier}'
+  
+          #these are used to get stats of single asset and contract to harvest slug -> get stats
+          openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
+          openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
+  
+          #unusable until API key is delivered
+          openSeaAssetData = requests.get(openSeaAssetLink, headers={'X-API-KEY':f'{osAPIkey}'})
+          openSeaContractData = requests.get(openSeaContractLink, headers={'X-API-KEY':f'{osAPIkey}'})
+          floorAtLogging = 'N/A'
+  
+          #Web3 Section:
+          
+          #Get price of acquisition
+          transactionData = w3.eth.get_transaction(txHash)
+          price = w3.fromWei(int(transactionData['value']), 'ether')
+  
+          #Get total cost of acquisition
+          cost = getTotalTransactionCost(txHash)
+  
+          investment = [txHash, nftTitle, cost, price, floorAtLogging, contract]
+          
           with open(path_to_user_list, 'a') as userList:
             writer = csv.writer(userList)
             writer.writerow(investment)
@@ -241,18 +237,13 @@ class nfts(commands.Cog):
           transactionEmbed.set_thumbnail(url=userPFP)
     
           await ctx.send(embed=transactionEmbed)
+
+      else:
+        await sendErrorMessage(ctx, f'Transaction already logged in {author}\'s database.')
        
   
   @commands.command()
-  async def ethStats(self, ctx, ethVGwei = None):
-    if ethVGwei == None:
-      await sendErrorMessage(ctx, 'Choose gas price unit (either ETH or Gwei)', True, '*ethStats <unit> (unit either \'eth\' or \'gwei\')')
-    
-    elif ethVGwei.lower() != 'eth' and ethVGwei.lower() != 'gwei':
-      await sendErrorMessage(ctx, 'Enter a valid gas price unit (either ETH or Gwei)', True, '*ethStats <unit> (unit either \'eth\' or \'gwei\')')
-
-    else:
-      choice = ethVGwei.lower()
+  async def ethStats(self, ctx):
       etherscanAPIprice = f'https://api.etherscan.io/api?module=stats&action=ethprice&apikey={etherscanAPIkey}'
   
       etherscanPriceResponse = requests.get(etherscanAPIprice)
@@ -265,14 +256,9 @@ class nfts(commands.Cog):
       gasPriceJSON = json.loads(etherscanGasPriceResponse.text)
       results = gasPriceJSON['result']
 
-      if choice == 'gwei':
-        safeGas = f"{results['SafeGasPrice']} gwei"
-        proposedGas = f"{results['ProposeGasPrice']} gwei"
-        fastGas = f"{results['FastGasPrice']} gwei"
-      elif choice == 'eth':
-        safeGas = f"{gweiToEth(int(results['SafeGasPrice']))} eth"
-        proposedGas = f"{gweiToEth(int(results['ProposeGasPrice']))} eth"
-        fastGas = f"{gweiToEth(int(results['FastGasPrice']))} eth"
+      safeGas = f"{results['SafeGasPrice']} gwei"
+      proposedGas = f"{results['ProposeGasPrice']} gwei"
+      fastGas = f"{results['FastGasPrice']} gwei"
   
       ethEmbed = nextcord.Embed(title = 'Ethereum Stats', description = 'Quick Ethereum stats from the Etherscan API.', color = blue)
       ethEmbed.set_thumbnail(url = 'https://thumbs.gfycat.com/EqualPowerfulKoodoo-size_restricted.gif')

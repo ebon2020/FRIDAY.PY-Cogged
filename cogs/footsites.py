@@ -61,7 +61,6 @@ class footsites(commands.Cog):
       id = ctx.author.id
       path_to_file = f'./SKULists/{id}.csv'
       path_to_users = './SKULists/userSKULists.csv'
-      users = []
       #this switch will be flipped off if the user already has a list in the system
       userHasList = checkUserSKUList(id, path_to_users)
       if not userHasList:
