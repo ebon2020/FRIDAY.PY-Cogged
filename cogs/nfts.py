@@ -47,12 +47,15 @@ nftCommands = {
   'logInvestment <txHash>':'logs an NFT investment into the user\'s database.' 
 }
 
+#gwei to Eth conversion for Values from web3 api
 def gweiToEth(gwei):
   return gwei*0.000000001
 
+#wei to Eth conversion for Values from web3 api
 def weiToEth(wei):
   return wei/1000000000000000000
 
+#easy way to get a total transaction cost by simply inputting txHash
 def getTotalTransactionCost(tx):
   transactionData = w3.eth.get_transaction(tx)
   transactionReceiptData = w3.eth.get_transaction_receipt(tx)
@@ -64,6 +67,7 @@ def getTotalTransactionCost(tx):
   totalTransactionCost = float(price)+float(cutTransactionFee)
   return(totalTransactionCost)
 
+#gateway function for nft investment database functions
 def checkUserInvList(id, pathToUserList):
     users = []
     userHasSKUList = False
@@ -81,6 +85,7 @@ def checkUserInvList(id, pathToUserList):
     else:
         return False
 
+#checking for a transaction in a user database
 def checkTxInDatabase(tx, path_to_user_list):
   investmentData = pd.read_csv(path_to_user_list)
   txList = investmentData.txHash.tolist()
@@ -135,7 +140,7 @@ class nfts(commands.Cog):
       
         with open(path_to_file, 'w') as newUserInvList:
             writer = csv.writer(newUserInvList)
-            headerRow=['txHash','nftName','totalCost','price','floorAtLogging','contract']
+            headerRow=['txHash','nftName','totalCost','price','floorAtLogging','contract', 'uniqueContractIdentifierID']
             writer.writerow(headerRow)
         newUserInvList.close()
       
@@ -198,7 +203,9 @@ class nfts(commands.Cog):
           identifierSpan = soup.find('span',{'class':'hash-tag text-truncate'})
           identifierLink = identifierSpan.find('a').attrs['href']
           identifierSplit = identifierLink.split('=')
+          contractIdentifierComboSplit = identifierLink.split('/')
           identifier = identifierSplit[-1]
+          uniqueContractIdentifierID = contractIdentifierComboSplit[-1]
   
           nftTitle = f'{title}#{identifier}'
   
@@ -220,7 +227,7 @@ class nfts(commands.Cog):
           #Get total cost of acquisition
           cost = getTotalTransactionCost(txHash)
   
-          investment = [txHash, nftTitle, cost, price, floorAtLogging, contract]
+          investment = [txHash, nftTitle, cost, price, floorAtLogging, contract, uniqueContractIdentifierID]
           
           with open(path_to_user_list, 'a') as userList:
             writer = csv.writer(userList)
