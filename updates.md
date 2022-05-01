@@ -25,6 +25,19 @@
 1.3.1 Updates:
   - added safeguards against duplication of investments and database files.
   - added credits.
+
+1.3.2 Updates:
+  - Officially implemented *checkInvestment - this returns a quick summary (sans rarity implementation) of current logged investments.
+  - Optimizations of requests (specifically timing to avoid rate limits on OpenSea API).
+
+1.3.3 Updates:
+  - Officially implemented *logSale - which removes the NFT from the investment database of the user, and returns the profit of the investment. The logSale embed will become more complicated to include more information in the future.
+  - Improved error handling in various areas, ensuring the best experience for the user.
+
 ---------
 1.4 Targets:
   - implement a NFT collection floor monitor, which adds new floors to monitor with stored investments.
+
+1.5 Targets:
+  - Add profit tracking implementation
+  - Add autosale feature?

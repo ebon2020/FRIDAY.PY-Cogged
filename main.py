@@ -30,8 +30,7 @@ cogDescriptions = {
     'Footsites':
     'Commands that give info about footsites/store footsite SKUs.',
     'NFTs': 'Commands that scrape ETH info/store investment transactions.',
-    'Shopify': 'Commands that scrape info about Shopify products.',
-    'SNKRS': 'Commands that help set up for SNKRS releases.'
+    'Shopify': 'Commands that scrape info about Shopify products.'
 }
 
 #loading commands
@@ -42,7 +41,7 @@ mainCommands = {
     'loaded':'See which cogs are loaded into FRIDAY'
 }
 
-cogs = {'footsites': True, 'nfts': True, 'shopify': True, 'snkrs': True}
+cogs = {'footsites': True, 'nfts': True, 'shopify': True}
 
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):

@@ -12,6 +12,10 @@ blue = c.blue()
 #keeping track of version number
 version = os.environ['Version']
 
+shopCommands = {
+  'shopScrape <productLink>':'Scrape variants of a Shopify product.'
+}
+
 #credits, version number and bot Icon
 webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550 | Shopify'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
@@ -37,6 +41,16 @@ class shopify(commands.Cog):
   def __init__(self,client):
     self.client = client
 
+  @commands.command()
+  async def shopifyHelp(self,ctx):
+    helpEmbed = nextcord.Embed(title = 'NFT Help!', description = 'Commands in the NFT cog:')
+    for command in shopCommands:
+      helpEmbed.add_field(name = f'`*{command}`', value=f'{shopCommands[command]}')
+    helpEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+    helpEmbed.set_thumbnail(url=footerUrl)
+    
+    await ctx.send(embed=helpEmbed)
+    
   @commands.command()
   async def shopScrape(self, ctx, productLink=None):
       channel = ctx.channel

@@ -3,9 +3,9 @@
     "cogs/nfts.py": [
       {
         "id": "fc2634a5-c857-44da-89ed-1b8fd7240b22",
-        "line": 238,
-        "version": 10103,
-        "index": 9099
+        "line": 307,
+        "version": 18806,
+        "index": 12065
       }
     ]
   }
