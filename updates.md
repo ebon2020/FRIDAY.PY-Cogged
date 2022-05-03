@@ -34,9 +34,23 @@
   - Officially implemented *logSale - which removes the NFT from the investment database of the user, and returns the profit of the investment. The logSale embed will become more complicated to include more information in the future.
   - Improved error handling in various areas, ensuring the best experience for the user.
 
+1.3.4 Updates:
+  - Added logging for sales, and restricted data entry to forbid past transactions from being reentered. This assures that one user cannot inflate their perceived profit by entering the same profitable investment multiple times.
+  - Slight reworks to request timing in order to avoid API rate limits from OpenSea.
+  - Added more error logging.
+
+1.3.5
+  - Added support for multi-nft mints. Now, no matter what, FRIDAY will pick up all NFT's traded in a transaction. Each NFT that is minted in a group will have a percentage price of the total cost of the transaction, and is logged as such.
+  - Tweaked data logging, and shifted NFT image url requesting to per-logging basis, whether that be selling or investing, this is so that each time the NFT is mentioned in a transaction, the most recent image is grabbed from the OpenSea API, it's better that than storing an outdated image.
+  - There are now two types of investment embeds - accounting for multi-NFT transactions. These embeds will grab the image url for the collection rather than the url of all the different NFT's, simply because it's better this way.
 ---------
+1.3 Updates to do:
+  - implement a viewSales command which will show you whether or not you should have held in your past investments
+  - implement a viewNFTs command which will allow you to quickly see what NFTs you have logged.
+
 1.4 Targets:
   - implement a NFT collection floor monitor, which adds new floors to monitor with stored investments.
+  - Add multi-nft mint support on *logInvestment without need for differentiation from user.
 
 1.5 Targets:
   - Add profit tracking implementation

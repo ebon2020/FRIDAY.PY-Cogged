@@ -46,17 +46,16 @@ user_agent_rotator = UserAgent(software_names=software_names,
 w3 = Web3(Web3.HTTPProvider(f'{quickNodeEndpoint}'))
 
 #NFT commands
-nftCommands = {
-    'seaScrape':
-    'Scrapes a collections statistics on OpenSea.',
-    'ethStats <unit>':
-    'Returns ETH price and gas price in gwei/eth.',
+ethCommands = {
+    'seaScrape': 'Scrapes a collections statistics on OpenSea.',
+    'ethStats <unit>': 'Returns ETH price and gas price in gwei/eth.',
     'createInvDatabase':
     'Creates a serverside database for user to store NFT investments.',
-    'logInvestment <txHash>':
-    'Logs an NFT investment into the user\'s database.',
+    'logInv <txHash>':
+    'Logs an NFT investment into the user\'s investment database.',
     'logSale <txHash>':
-    'Logs an NFT sale, removing NFT from database and logging profits.'
+    'Logs an NFT sale, removing NFT from database and logging profits.',
+    'checkInvestments': 'Quickly check up on your logged invesments.'
 }
 
 
@@ -111,21 +110,23 @@ def checkInDatabase(tx, path_to_user_list):
             return True
     return False
 
+
 #same but for sales
 def checkInSaleDatabase(tx, path_to_user_list):
-  investmentData = pd.read_csv(path_to_user_list)
-  txList = investmentData.invTxHash.tolist()
-  for transaction in txList:
-      if tx in transaction:
-          return True
-  return False
+    investmentData = pd.read_csv(path_to_user_list)
+    txList = investmentData.invTxHash.tolist()
+    for transaction in txList:
+        if tx in transaction:
+            return True
+    return False
+
 
 #grabbing floor of OS collection
 def findFloor(slug):
     openSeaStatsLink = f'https://api.opensea.io/api/v1/collection/{slug}/stats'
     slugStatsData = requests.get(openSeaStatsLink)
     slugStats = json.loads(slugStatsData.text)
-    return slugStats['stats']['floor_price']
+    return float(slugStats['stats']['floor_price'])
 
 
 #check if request was redirected
@@ -159,12 +160,12 @@ class nfts(commands.Cog):
         self.client = client
 
     @commands.command()
-    async def nftsHelp(self, ctx):
-        helpEmbed = nextcord.Embed(title='NFT Help!',
-                                   description='Commands in the NFT cog:')
-        for command in nftCommands:
+    async def ethHelp(self, ctx):
+        helpEmbed = nextcord.Embed(title='ETH Help!',
+                                   description='Commands in the ETH cog:')
+        for command in ethCommands:
             helpEmbed.add_field(name=f'`*{command}`',
-                                value=f'{nftCommands[command]}')
+                                value=f'{ethCommands[command]}')
         helpEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
         helpEmbed.set_thumbnail(url=footerUrl)
 
@@ -189,7 +190,7 @@ class nfts(commands.Cog):
                 headerRow = [
                     'nftName', 'txHash', 'slug', 'totalCost', 'price',
                     'floorAtLogging', 'contract', 'uniqueContractIdentifierID',
-                    'image_url', 'transactionType', 'transDate'
+                    'transactionType', 'transDate'
                 ]
                 writer.writerow(headerRow)
             newUserInvList.close()
@@ -203,7 +204,7 @@ class nfts(commands.Cog):
             affirmEmbed = nextcord.Embed(
                 title=f'Database Created for user: `{author}`',
                 description=
-                'Run `*logInvestment` to start building your investment list!',
+                'Run `*logInv` to start building your investment list!',
                 color=affirm)
             affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
             await ctx.channel.send(embed=affirmEmbed)
@@ -212,7 +213,7 @@ class nfts(commands.Cog):
                                    f'{author}\'s database already exists!')
 
     @commands.command()
-    async def logInvestment(self, ctx, txHash=None):
+    async def logInv(self, ctx, txHash=None):
         if txHash != None:
             author = ctx.author
             id = author.id
@@ -234,17 +235,13 @@ class nfts(commands.Cog):
                                        headers={'User-Agent': f'{user_agent}'})
 
                 #seeing if we've been redirected from etherscan link indicating error
-                redirectedToError = False
-                for item in request.history:
-                    if int(item.status_code) == 302:
-                        redirectedToError = True
 
                 txInList = checkInDatabase(txHash, path_to_user_list)
                 loggedBefore = checkInSaleDatabase(txHash, path_to_user_sales)
 
                 if not txInList and not loggedBefore:
                     #want to ensure we are not banned or redirected
-                    if request.status_code == 200 and redirectedToError == False:
+                    if request.status_code == 200:
                         #initialize BS4 to analyze etherscan trans page
                         soup = BeautifulSoup(request.text, features="html5lib")
 
@@ -272,35 +269,58 @@ class nfts(commands.Cog):
                             '/')
                         contract = etherscanContractPathSplit[-1]
 
-                        #find the identifier tag of the NFT (e.g. #2907)
-                        identifierSpan = soup.find(
+                        nftDict = {}
+                        tokenClasses = soup.find_all(
                             'span', {'class': 'hash-tag text-truncate'})
-                        identifierLink = identifierSpan.find('a').attrs['href']
-                        identifierSplit = identifierLink.split('=')
-                        contractIdentifierComboSplit = identifierLink.split(
-                            '/')
-                        identifier = identifierSplit[-1]
-                        uniqueContractIdentifierID = contractIdentifierComboSplit[
-                            -1]
 
-                        nftTitle = f'{title}#{identifier}'
+                        for item in tokenClasses:
+                            href = item.find('a').attrs['href']
+                            href = str(href)
+                            hrefSplit = href.split('/')
+                            identifierSplit = href.split('=')
+                            identifier = identifierSplit[-1]
+                            contractIdentifier = hrefSplit[-1]
+                            if '/' not in identifier:
+                                nftDict[identifier] = contractIdentifier
+                            else:
+                                continue
+                        amountOfNftsInTransaction = len(nftDict)
+
+                        identifierString = ''
+                        if amountOfNftsInTransaction == 1:
+                            identifier = list(nftDict.keys())[0]
+                        else:
+                            for key in nftDict:
+                                identifierString += f' #{key} |'
+                            identifierString = identifierString[1:]
 
                         #these are used to get stats of single asset and contract to harvest slug -> get stats
-                        openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
-                        openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
+                        if amountOfNftsInTransaction == 1:
+                            openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{identifier}/?include_orders=false'
+                            openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
 
-                        openSeaAssetData = requests.get(
-                            openSeaAssetLink,
-                            headers={'X-API-KEY': f'{osAPIkey}'})
-                        if openSeaAssetData.status_code == 200:
-                            time.sleep(0.25)
+                            openSeaAssetData = requests.get(
+                                openSeaAssetLink,
+                                headers={'X-API-KEY': f'{osAPIkey}'})
                             openSeaContractData = requests.get(
                                 openSeaContractLink,
                                 headers={'X-API-KEY': f'{osAPIkey}'})
-                        openSeaAsset = json.loads(openSeaAssetData.text)
-                        openSeaContract = json.loads(openSeaContractData.text)
-                        nftUrl = openSeaAsset['image_url']
-                        slug = openSeaContract['collection']['slug']
+
+                            openSeaAsset = json.loads(openSeaAssetData.text)
+                            openSeaContract = json.loads(
+                                openSeaContractData.text)
+                            nftUrl = openSeaAsset['image_url']
+                            slug = openSeaContract['collection']['slug']
+                        else:
+                            openSeaContractLink = f'https://api.opensea.io/api/v1/asset_contract/{contract}'
+                            openSeaContractData = requests.get(
+                                openSeaContractLink,
+                                headers={'X-API-KEY': f'{osAPIkey}'})
+                            openSeaContract = json.loads(
+                                openSeaContractData.text)
+                            slug = openSeaContract['collection']['slug']
+                            nftUrl = openSeaContract['collection'][
+                                'featured_image_url']
 
                         openSeaStatsLink = f'https://api.opensea.io/api/v1/collection/{slug}/stats'
                         slugStatsData = requests.get(openSeaStatsLink)
@@ -311,8 +331,7 @@ class nfts(commands.Cog):
 
                         #Get price of acquisition
                         transactionData = w3.eth.get_transaction(txHash)
-                        price = w3.fromWei(int(transactionData['value']),
-                                           'ether')
+                        price = w3.fromWei(int(transactionData['value']),'ether')
 
                         #Get total cost of acquisition
                         cost = getTotalTransactionCost(txHash)
@@ -322,52 +341,96 @@ class nfts(commands.Cog):
                         timecode = w3.eth.get_block(block).timestamp
                         transDate = datetime.datetime.fromtimestamp(
                             timecode).isoformat()
+                        transDateString = str(transDate)
+                        dateList = transDateString.split('T')
+                        transDate = dateList[0]
 
-                        investment = [
-                            nftTitle, txHash, slug, cost, price,
-                            floorAtLogging, contract,
-                            uniqueContractIdentifierID, nftUrl,
-                            loggedTransType, transDate
-                        ]
-
-                        with open(path_to_user_list, 'a') as userList:
-                            writer = csv.writer(userList)
-                            writer.writerow(investment)
-                        userList.close()
+                        for nft in nftDict:
+                            nftTitle = f'{title}#{nft}'
+                            contractIdentifier = nftDict[nft]
+                            investment = [
+                                nftTitle, txHash, slug, cost / len(nftDict),
+                                price / len(nftDict), floorAtLogging, contract,
+                                contractIdentifier, loggedTransType, transDate
+                            ]
+                            with open(path_to_user_list,
+                                      'a') as userInvestments:
+                                writer = csv.writer(userInvestments)
+                                writer.writerow(investment)
+                            userInvestments.close()
 
                         #Build embed to relay information.
-                        transactionEmbed = nextcord.Embed(
-                            title=f'NFT Investment: `{nftTitle}`',
-                            description=
-                            f'Logging new investment for user: `{author}`',
-                            color=affirm)
-                        transactionEmbed.add_field(
-                            name=f'Transaction type: {transactionType}',
-                            value=f'Origin Contract: `{contract}`',
-                            inline=False)
-                        transactionEmbed.add_field(name='Price:',
-                                                   value=f'`{price}` **Ξ**',
-                                                   inline=True)
-                        transactionEmbed.add_field(
-                            name='Total Cost:',
-                            value=f'`{round(cost,4)}` **Ξ**')
-                        transactionEmbed.add_field(
-                            name='Current Floor (OS):',
-                            value=f'`{floorAtLogging}` **Ξ**',
-                            inline=True)
-                        transactionEmbed.add_field(name='Transaction Date:',
-                                                   value=f'`{transDate}`',
-                                                   inline=False)
-                        transactionEmbed.set_footer(text=webhookFooter,
-                                                    icon_url=footerUrl)
-                        transactionEmbed.set_thumbnail(url=nftUrl)
-
+                        if amountOfNftsInTransaction == 1:
+                            transactionEmbed = nextcord.Embed(
+                                title=f'NFT Investment: `{title}#{identifier}`',
+                                description=
+                                f'Logging new investment for user: `{author}`',
+                                color=affirm)
+                            transactionEmbed.add_field(
+                                name=f'Transaction type: {transactionType}',
+                                value=f'Origin Contract: `{contract}`',
+                                inline=False)
+                            transactionEmbed.add_field(
+                                name='Price:',
+                                value=f'`{round(float(price),4)}` **Ξ**',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Total Cost:',
+                                value=f'`{round(float(cost),4)}` **Ξ**')
+                            transactionEmbed.add_field(
+                                name='Current Floor (OS):',
+                                value=
+                                f'`{round(float(floorAtLogging),4)}` **Ξ**',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Transaction Date:',
+                                value=f'`{transDate}`',
+                                inline=False)
+                            transactionEmbed.set_footer(text=webhookFooter,
+                                                        icon_url=footerUrl)
+                            transactionEmbed.set_thumbnail(url=nftUrl)
+                        else:
+                            transactionEmbed = nextcord.Embed(
+                                title=f'NFT Investment: `{title} Collection`',
+                                description=
+                                f'Logging new investment for user: `{author}`',
+                                color=affirm)
+                            transactionEmbed.add_field(
+                                name=f'Transaction type: {transactionType}',
+                                value=f'Origin Contract: `{contract}`',
+                                inline=False)
+                            transactionEmbed.add_field(
+                                name='Total Price:',
+                                value=f'`{round(price,4)}` **Ξ**',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Total Cost:',
+                                value=f'`{round(cost,4)}` **Ξ**',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Current Floor (OS)',
+                                value=
+                                f'`{round(float(floorAtLogging),4)}` **Ξ**',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Total Minted:',
+                                value=f'`{len(nftDict)}`',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Total Cost per NFT:',
+                                value=f'`{round((float(cost)/float(len(nftDict))), 4)}`',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Transaction Date:',
+                                value=f'`{transDate}`',
+                                inline=True)
+                            transactionEmbed.add_field(
+                                name='Minted NFTs:',
+                                value=f'```{identifierString}```')
+                            transactionEmbed.set_thumbnail(url=nftUrl)
+                            transactionEmbed.set_footer(text=webhookFooter,
+                                                        icon_url=footerUrl)
                         await ctx.send(embed=transactionEmbed)
-                    elif redirectedToError == True:
-                        await sendErrorMessage(
-                            ctx,
-                            'Request redirected to Etherscan Error Page. Please ensure correctness of transaction hash and try again.'
-                        )
                 else:
                     await sendErrorMessage(
                         ctx,
@@ -380,7 +443,7 @@ class nfts(commands.Cog):
         else:
             await sendErrorMessage(
                 ctx, 'Transaction Hash must be included in command', True,
-                '*logInvestment <txHash>')
+                '*logInv <txHash>')
 
     @commands.command()
     async def checkInvestments(self, ctx):
@@ -478,17 +541,16 @@ class nfts(commands.Cog):
 
                     if redirectedToError == False:
                         userInvestments = pd.read_csv(path_to_user_list)
-                        uniqueNFTKeys = userInvestments.uniqueContractIdentifierID.tolist()
+                        uniqueNFTKeys = userInvestments.uniqueContractIdentifierID.tolist(
+                        )
 
                         soup = BeautifulSoup(request.text, features='html5lib')
                         #find the identifier tag of the NFT (e.g. #2907)
                         identifierSpan = soup.find(
                             'span', {'class': 'hash-tag text-truncate'})
                         identifierLink = identifierSpan.find('a').attrs['href']
-                        contractIdentifierComboSplit = identifierLink.split(
-                            '/')
-                        uniqueContractIdentifierID = contractIdentifierComboSplit[
-                            -1]
+                        contractIdentifierComboSplit = identifierLink.split('/')
+                        uniqueContractIdentifierID = contractIdentifierComboSplit[-1]
                         userHasNFT = False
                         for item in uniqueNFTKeys:
                             if uniqueContractIdentifierID in item:
@@ -496,20 +558,32 @@ class nfts(commands.Cog):
                         if userHasNFT:
                             #finding the sellPrice via web3 and the buyPrice via stored data.
                             transactionData = w3.eth.get_transaction(txHash)
-                            sellPrice = float(
-                                w3.fromWei(float(transactionData['value']),
-                                           'ether'))
+                            sellPrice = float(w3.fromWei(float(transactionData['value']), 'ether'))
 
                             #get date of transaction
                             block = transactionData.blockNumber
                             timecode = w3.eth.get_block(block).timestamp
                             saleDate = datetime.datetime.fromtimestamp(
                                 timecode).isoformat()
+                            saleDateString = str(saleDate)
+                            dateList = saleDateString.split('T')
+                            saleDate = dateList[0]
+                          
                             nftData = userInvestments.loc[
                                 userInvestments['uniqueContractIdentifierID']
                                 == uniqueContractIdentifierID]
                             buyPrice = nftData['totalCost'].values[0]
                             investmentTransaction = nftData['txHash'].values[0]
+                            floorAtLogging = float(nftData['floorAtLogging'].values[0])
+                            slug = nftData['slug'].values[0]
+
+                            #find current floor
+
+                            currentFloor = findFloor(slug)
+
+                            percentageFromFloor = ((sellPrice-currentFloor)/currentFloor)*100
+
+                            percentageGrowth = ((currentFloor-floorAtLogging)/floorAtLogging)*100
 
                             #finding fees off OS platform.
                             contract = nftData['contract'].values[0]
@@ -517,26 +591,29 @@ class nfts(commands.Cog):
                             contractDataResponse = requests.get(
                                 openSeaContractLink,
                                 headers={'X-API-KEY': f'{osAPIkey}'})
-                            contractData = json.loads(
-                                contractDataResponse.text)
-                            sellerFees = int(
-                                contractData['dev_seller_fee_basis_points']) / 100
+                            contractData = json.loads(contractDataResponse.text)
+                            sellerFees = int(contractData['dev_seller_fee_basis_points']) / 100
                             totalFees = sellerFees + 2.5  #opensea takes 2.5 percent of every transaction
                             transactionMultiplier = 1 - (totalFees / 100)
                             totalEthToSeller = sellPrice * transactionMultiplier
 
                             totalProfit = totalEthToSeller - buyPrice
 
-                            loggedTransactionType = nftData[
-                                'transactionType'].values[0]
+                            loggedTransactionType = nftData['transactionType'].values[0]
                             if str(loggedTransactionType) == 'mint':
-                                buyIn = 'Mint Price:'
+                                buyIn = 'Mint Cost:'
                             elif str(loggedTransactionType) == 'transfer':
                                 buyIn = 'Buy-in:'
 
-                            nftImage = nftData['image_url'].values[0]
                             nftTitleList = nftData.nftName.tolist()
                             nftTitle = nftTitleList[0]
+                            nftIdentifierList = nftTitle.split('#')
+                            nftIdentifier = nftIdentifierList[-1]
+
+                            openSeaAssetLink = f'https://api.opensea.io/api/v1/asset/{contract}/{nftIdentifier}/?include_orders=false'
+                            nftImageData = requests.get(openSeaAssetLink,headers={'X-API-KEY': f'{osAPIkey}'})
+                            nftImageJSON =json.loads(nftImageData.text)
+                            nftImage = nftImageJSON['image_url']                            
 
                             investmentIndex = userInvestments.index[
                                 userInvestments["nftName"] == str(
@@ -546,7 +623,10 @@ class nfts(commands.Cog):
                             userInvestments.to_csv(f'{path_to_user_list}',
                                                    index=False)
 
-                            loggingList = [saleDate, totalProfit, txHash, investmentTransaction]
+                            loggingList = [
+                                saleDate, totalProfit, txHash,
+                                investmentTransaction
+                            ]
 
                             with open(path_to_user_sales, 'a') as userSales:
                                 writer = csv.writer(userSales)
@@ -571,9 +651,17 @@ class nfts(commands.Cog):
                                 value=f'`{round(sellPrice,4)}` **Ξ**',
                                 inline=True)
                             loggedSaleEmbed.add_field(
-                                name='Profit:',
+                                name='Profit (post fees):',
                                 value=f'`{round(totalProfit,4)}` **Ξ**')
-                            loggedSaleEmbed.add_field(name='Transaction Date:',value=f'`{saleDate}`', inline=False)
+                            loggedSaleEmbed.add_field(name='Transaction Date:',
+                                                      value=f'`{saleDate}`',
+                                                      inline=True)
+                            loggedSaleEmbed.add_field(name='Current Floor (OS):',value=f'`{currentFloor}` **Ξ**',inline=True)
+                            loggedSaleEmbed.add_field(name='View TX:', value=f'[Etherscan]({etherscanLink})', inline=True)
+                            if percentageGrowth < 0:
+                              loggedSaleEmbed.add_field(name='Investment Summary:',value=f'```This collection\'s value decreased {round(percentageGrowth,4)}% from when you logged your transaction to when you logged your sale and you sold for {round(percentageFromFloor,4)}% from the current floor price.```',inline=False)
+                            else:
+                              loggedSaleEmbed.add_field(name='Investment Summary:',value=f'```This collection\'s value increased {round(percentageGrowth,4)}% from when you logged your transaction to when you logged your sale and you sold for {round(percentageFromFloor,4)}% from the current floor price.```', inline= False)
                             loggedSaleEmbed.set_thumbnail(url=nftImage)
                             loggedSaleEmbed.set_footer(text=webhookFooter,
                                                        icon_url=footerUrl)

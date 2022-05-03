@@ -29,7 +29,7 @@ my_secret = os.environ['token']
 cogDescriptions = {
     'Footsites':
     'Commands that give info about footsites/store footsite SKUs.',
-    'NFTs': 'Commands that scrape ETH info/store investment transactions.',
+    'ETH': 'Commands that scrape ETH info/store investment transactions.',
     'Shopify': 'Commands that scrape info about Shopify products.'
 }
 
@@ -41,8 +41,7 @@ mainCommands = {
     'loaded':'See which cogs are loaded into FRIDAY'
 }
 
-cogs = {'footsites': True, 'nfts': True, 'shopify': True}
-
+cogs = {'footsites': True, 'eth': True, 'shopify': True}
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):
     embed = nextcord.Embed(
