@@ -214,6 +214,7 @@ class shopify(commands.Cog):
           await ctx.send(embed=linkAddedEmbed)
       else:
         await sendErrorMessage(ctx,'Link not valid.')
-        
+    else:
+      await sendErrorMessage(ctx, 'Cannot use command without a database.', True, '*createShopList')
 def setup(client):
   client.add_cog(shopify(client))
