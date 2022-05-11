@@ -15,9 +15,13 @@
   - Upgraded from Discord.PY which has since reached EOL. Now using Nextcord for any Discord API/asynchronous programming.
   - Also changed backend enviroments for Host, as Discord.PY is incompatible with Nextcord (this meant changing repositories)
 
+-------------------
+
 1.2 Updates:
   - Reached all goals for 1.1 version (OpenSea API interactions, better file structure, more extensive commenting...)
-  - Added cog implementation (run *loadCog, *unloadCog, and *reloagCog to manage loaded features). This means I can make changes and edits to the code without having to restart the bot, instead I can simply refresh the cog.
+  - Added cog implementation (run *loadCog, *unloadCog, and *reloadCog to manage loaded features). This means I can make changes and edits to the code without having to restart the bot, instead I can simply refresh the cog.
+
+-------------------
 
 1.3 Updates:
   - Added NFT investment logging + creation of user databases.
@@ -39,19 +43,27 @@
   - Slight reworks to request timing in order to avoid API rate limits from OpenSea.
   - Added more error logging.
 
-1.3.5
-  - Added support for multi-nft mints. Now, no matter what, FRIDAY will pick up all NFT's traded in a transaction. Each NFT that is minted in a group will have a percentage price of the total cost of the transaction, and is logged as such.
+1.3.5 Updates
+  - Added support for multi-nft mints. Now, no matter what, FRIDAY will pick up all NFTs traded in a transaction. Each NFT that is minted in a group will have a percentage price of the total cost of the transaction and is logged as such.
   - Tweaked data logging, and shifted NFT image url requesting to per-logging basis, whether that be selling or investing, this is so that each time the NFT is mentioned in a transaction, the most recent image is grabbed from the OpenSea API, it's better that than storing an outdated image.
   - There are now two types of investment embeds - accounting for multi-NFT transactions. These embeds will grab the image url for the collection rather than the url of all the different NFT's, simply because it's better this way.
+
+1.3.6 Updates
+  - Rewrote SKU storing commands to use Pandas versus iterating through with csv reader. It's lighter weight, and improves performance + it normalizes the csv parsing software I use throughout the project.
+  - Rewrote *listSKU to use Pandas as well.
+  - Began implementation of a link storing database to store Shopify restock links for each user, making them readily accessible so long as the user has access to Discord. *delLink and *listLink will be implemented in 1.3.7
+    
 ---------
 1.3 Updates to do:
-  - implement a viewSales command which will show you whether or not you should have held in your past investments
-  - implement a viewNFTs command which will allow you to quickly see what NFTs you have logged.
+  - implement a viewSales command which will show you whether or not you should have held in your past investments 🔴
+  - implement a viewNFTs command which will allow you to quickly see what NFTs you have logged 🔴
+  - Add a storage system for shopify restock links 🟡
 
 1.4 Targets:
   - implement a NFT collection floor monitor, which adds new floors to monitor with stored investments.
-  - Add multi-nft mint support on *logInvestment without need for differentiation from user.
+  - Add multi-nft mint support on *logInvestment without need for differentiation from user. (Done)
+  - all 1.3 updates to do.
 
 1.5 Targets:
   - Add profit tracking implementation
-  - Add autosale feature?
+  - Add NFT autolist feature?

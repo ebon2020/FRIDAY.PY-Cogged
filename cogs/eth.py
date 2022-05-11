@@ -30,7 +30,7 @@ quickNodeEndpoint = os.environ['quickNode Endpoint']
 version = os.environ['Version']
 
 #credits, version number and bot Icon
-webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550 | NFTs'
+webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#2020 | ETH'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
 
 #user agents for requests
@@ -160,6 +160,7 @@ class nfts(commands.Cog):
         self.client = client
 
     @commands.command()
+    @commands.guild_only()
     async def ethHelp(self, ctx):
         helpEmbed = nextcord.Embed(title='ETH Help!',
                                    description='Commands in the ETH cog:')
@@ -172,6 +173,7 @@ class nfts(commands.Cog):
         await ctx.send(embed=helpEmbed)
 
     @commands.command()
+    @commands.guild_only()
     async def createInvDatabase(self, ctx):
         author = ctx.author.name
         id = ctx.author.id
@@ -469,7 +471,7 @@ class nfts(commands.Cog):
                 nftNameListCounter += 1
 
             for slug in slugList:
-                currentFloorList.append(findFloor(slug))
+                currentFloorList.append(round(findFloor(slug),3))
                 time.sleep(0.25)
 
             currentFloorString = '\n'
@@ -666,7 +668,8 @@ class nfts(commands.Cog):
                             loggedSaleEmbed.set_footer(text=webhookFooter,
                                                        icon_url=footerUrl)
                             await ctx.send(embed=loggedSaleEmbed)
-
+                        else:
+                          await sendErrorMessage(ctx, f'{user} does not own NFT in sale transaction.')
                     elif redirectedToError == True:
                         await sendErrorMessage(
                             ctx,
@@ -688,6 +691,7 @@ class nfts(commands.Cog):
                 '*logSale <txHash>')
 
     @commands.command()
+    @commands.guild_only()
     async def ethStats(self, ctx):
         etherscanAPIprice = f'https://api.etherscan.io/api?module=stats&action=ethprice&apikey={etherscanAPIkey}'
 
@@ -727,6 +731,7 @@ class nfts(commands.Cog):
         await ctx.send(embed=ethEmbed)
 
     @commands.command()
+    @commands.guild_only()
     async def seaScrape(self, ctx, collection=None):
         if collection == None:
             await sendErrorMessage(ctx, 'No collection provided!', True,

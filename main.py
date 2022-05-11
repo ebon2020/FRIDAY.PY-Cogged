@@ -19,7 +19,7 @@ blue = c.blue()
 version = os.environ['Version']
 
 #credits, version number and bot Icon
-webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550'
+webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#2020'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
 
 #secrets (bot token etc.)
@@ -70,6 +70,7 @@ async def on_ready():
 
 
 @client.command()
+@commands.guild_only()
 async def FRIDAYhelp(ctx):
     helloEmbed = nextcord.Embed(
         title="Help!",
@@ -90,6 +91,7 @@ async def FRIDAYhelp(ctx):
 
 
 @client.command()
+@commands.guild_only()
 async def loadCog(ctx, extension=None):
     if extension == None:
         await sendErrorMessage(ctx, 'No cog provided.')
@@ -115,6 +117,7 @@ async def loadCog_error(ctx, error):
 
 
 @client.command()
+@commands.guild_only()
 async def unloadCog(ctx, extension):
     client.unload_extension(f'cogs.{extension}')
 
@@ -136,6 +139,7 @@ async def unloadCog_error(ctx, error):
 
 
 @client.command()
+@commands.guild_only()
 async def reloadCog(ctx, extension):
     client.reload_extension(f'cogs.{extension}')
     affirmEmbed = nextcord.Embed(
@@ -154,6 +158,7 @@ async def reloadCog_error(ctx, error):
 
 
 @client.command()
+@commands.guild_only()
 async def loaded(ctx):
     printString = ''
     for key in cogs:
@@ -169,6 +174,7 @@ async def loaded(ctx):
     await ctx.send(embed=infoEmbed)
 
 @client.command()
+@commands.guild_only()
 async def credits(ctx):
   creditsEmbed = nextcord.Embed(
       title=':heart: Credits :heart:',

@@ -5,6 +5,7 @@ from nextcord import Color as c
 import csv
 import requests
 from bs4 import BeautifulSoup
+import pandas as pd
 
 error = c.red()
 affirm = c.green()
@@ -14,7 +15,7 @@ blue = c.blue()
 version = os.environ['Version']
 
 #credits, version number and bot Icon
-webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550 | Footsites'
+webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#2020 | Footsites'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
 
 footsCommands = {
@@ -24,6 +25,8 @@ footsCommands = {
   'infoSKU <sku>':'Gathers info about a footsite SKU.',
   'listSKU <sku>':'Lists out a user\'s SKU list, add `True` to have it DM\'ed to you.'
 }
+
+pathToSKUUsers = './SKULists/userSKULists.csv'
 
 def checkUserSKUList(id, pathToUserList):
     users = []
@@ -41,6 +44,15 @@ def checkUserSKUList(id, pathToUserList):
         return True
     else:
         return False
+
+def checkSKU(sku, pathToUserList):
+  skuListData = pd.read_csv(pathToUserList)
+  skuList = skuListData.SKU.tolist()
+  for storedSKU in skuList:
+    if sku in storedSKU:
+      return True
+  return False
+  
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):
     #initiating the error embed
@@ -64,6 +76,7 @@ class footsites(commands.Cog):
     self.client = client
 
   @commands.command()
+  @commands.guild_only()
   async def footsitesHelp(self,ctx):
     helpEmbed = nextcord.Embed(title = 'Footsite Help!', description = 'Commands in the Footsite cog:')
     for command in footsCommands:
@@ -74,6 +87,7 @@ class footsites(commands.Cog):
     await ctx.send(embed=helpEmbed)
   
   @commands.command()
+  @commands.guild_only()
   async def createSKUList(self, ctx):
       author = ctx.author.name
       id = ctx.author.id
@@ -88,7 +102,9 @@ class footsites(commands.Cog):
           userLog.close()
           #Once we've logged the user, we then create a new sku list with their disc id as their file title
           with open(path_to_file, 'w') as newUserSKUList:
-              one = 1  #filler code
+              headerRow = ['SKU']
+              writer = csv.writer(newUserSKUList)
+              writer.writerow(headerRow)
           newUserSKUList.close()
           affirmEmbed = nextcord.Embed(
               title=f'Database Created for user: `{author}`',
@@ -107,31 +123,17 @@ class footsites(commands.Cog):
       if sku == None:
           await sendErrorMessage(ctx, 'No SKU provided.', True, '*addSKU <sku>')
       else:
-          skus = []
-          switch = False
-          author = ctx.author.name
-          id = ctx.author.id
-          path_to_file = f'./SKULists/{id}.csv'
+          author = ctx.author
+          id = author.id
           path_to_users = './SKULists/userSKULists.csv'
           imageLink = f"https://images.footlocker.com/is/image/EBFL2/{sku}_a1?wid=2000&hei=2000&fmt=png-alpha"
           userHasSKUList = checkUserSKUList(id, path_to_users)
   
           #first we need to ensure that the SKU does not already exist in the user's database to avoid duplication
           if userHasSKUList:
-              with open(path_to_file, 'r') as skuList1:
-                  skuReader = csv.reader(skuList1)
-                  for row in skuReader:
-                      skus.append(row)
-                  for item in skus:
-                      if sku in item:
-                          await sendErrorMessage(
-                              ctx, f"SKU already in {author}'s list!")
-                          #this switch keeps track of whether the SKU is in the list already
-                          switch = True
-              skuList1.close()
+              path_to_file = f'./SKULists/{id}.csv'
   
-              #if the switch remains closed, then we will write the SKU to our csv
-              if switch == False:
+              if not checkSKU(sku, path_to_file):
                   with open(path_to_file, 'a') as skuList2:
                       skuWriter = csv.writer(skuList2)
                       skuWriter.writerow([f"{sku}"])
@@ -143,6 +145,8 @@ class footsites(commands.Cog):
                   affirmEmbed.set_thumbnail(url=imageLink)
                   affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
                   await ctx.channel.send(embed=affirmEmbed)
+              else:
+                await sendErrorMessage(ctx,f'SKU already in {author}\'s list!')
           else:
               await sendErrorMessage(ctx, f'{author} has no SKU list!')
   
@@ -153,95 +157,72 @@ class footsites(commands.Cog):
   
   @commands.command()
   async def delSKU(self, ctx, sku=None):
-      if sku == None:
-          await sendErrorMessage(ctx, 'No SKU provided.', True, '*delSKU <sku>')
-      else:
-          skus = []
-          """this switch keeps track of whether the SKU is in the database. If it is, the command will proceed
-          #if not, then the command will end in an error"""
-          affirmSwitch = False
-          author = ctx.author.name
-          id = ctx.author.id
-          path_to_file = f'./SKULists/{id}.csv'
-          path_to_users = './SKULists/userSKULists.csv'
-          imageLink = f"https://images.footlocker.com/is/image/EBFL2/{sku}_a1?wid=2000&hei=2000&fmt=png-alpha"
-  
-          userHasSKUList = checkUserSKUList(id, path_to_users)
-  
-          if userHasSKUList:
-              affirmEmbed = nextcord.Embed(
-                  title='Success!',
-                  description=f"`{sku}` removed from `{author}'s` SKU list",
-                  color=error)
-              affirmEmbed.set_thumbnail(url=imageLink)
-              affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
-              with open(path_to_file, 'r') as skuList:
-                  reader = csv.reader(skuList)
-                  for row in reader:
-                      skus.append(row)
-                      for item in skus:
-                          if sku in item:
-                              skus.remove(item)
-                              await ctx.channel.send(embed=affirmEmbed)
-                              affirmSwitch = True
-                              """if the item is deleted, the switch is thrown, indicating we've found the SKU and 
-                              removed it."""
-                  if affirmSwitch == False:
-                      await sendErrorMessage(ctx, f"SKU not in {author}'s list!")
-              skuList.close()
-  
-              #lastly, we rewrite the list.
-              with open(path_to_file, 'w') as skuListWrite:
-                  writer = csv.writer(skuListWrite)
-                  writer.writerows(skus)
-              skuListWrite.close()
+      if sku != None:
+        author = ctx.author
+        id = author.id
+        if checkUserSKUList(id, pathToSKUUsers):
+          pathToUserList = f'./SKULists/{id}.csv'
+          if checkSKU(sku,pathToUserList):
+            imageLink = f"https://images.footlocker.com/is/image/EBFL2/{sku}_a1?wid=2000&hei=2000&fmt=png-alpha"
+            skuListFrame = pd.read_csv(pathToUserList)
+            skuList = skuListFrame.SKU.tolist()
+            for item in skuList:
+              if sku in item:
+                skuList.remove(item)
+            skuListRewrite = []
+            for item in skuList:
+              skuListRewrite.append([item])
+            with open(pathToUserList, 'w') as newList:
+              writer = csv.writer(newList)
+              writer.writerow(['SKU'])
+              writer.writerows(skuListRewrite)
+            newList.close()
+            deleteEmbed = nextcord.Embed(title='Success!', description=f'`{sku}` removed from `{author}\'s` SKU list!', color=error)
+            deleteEmbed.set_thumbnail(url=imageLink)
+            deleteEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+
+            await ctx.send(embed=deleteEmbed)
           else:
-              await sendErrorMessage(ctx, f'{author} has no SKU list!')
+            await sendErrorMessage(ctx, f'SKU not found in {author}\'s list!')
+        else:
+          await sendErrorMessage(ctx, 'You cannot use this command without a database.', True, '*createSKUList')
+      else:
+        await sendErrorMessage(ctx,'SKU not provided.', True, '*delSKU <sku>')
+    
   
   
   #this command is used to list out what SKUs the specific user has added to their database
   @commands.command()
   async def listSKU(self, ctx, private=None):
-      skus = []
-      skuString = ""
-      author = ctx.author.name
-      user = ctx.author
-      id = ctx.author.id
-      path_to_file = f'./SKULists/{id}.csv'
-      userPFP = user.avatar.url
-      with open(path_to_file, 'r') as skuList:
-          reader = csv.reader(skuList)
-          numSKUs = 0
-          for row in reader:
-              #unfortunately, I need to modify each row to make copy/pasting into bots easier
-              oneSKU = str(row)
-              rowVTwo = oneSKU.replace("'", "")
-              rowVThree = rowVTwo.replace("[", "")
-              rowVFour = rowVThree.replace("]", "")
-              amendedRow = str(rowVFour) + '\n'
-              skus.append(amendedRow)
-              numSKUs += 1
-      skuList.close()
-      for item in skus:
-          skuString += item
-  
+      author = ctx.author
+      id = author.id
+    
+      if checkUserSKUList(id, pathToSKUUsers):
+        userList = f'./SKULists/{id}.csv'
+        skuListDF = pd.read_csv(userList)
+        skus = skuListDF.SKU.tolist()
+        numSKUs = len(skus)
+        skuString = ''
+        for item in skus:
+          skuString += f'{item} \n'
+        
       #here I build and send the SKU list in an embed.
+      
       skuEmbed = nextcord.Embed(
           title=f'**Current SKU List**',
           description=
           f"These are the current footsite SKUs stored in `{author}'s` database.",
           color=blue)
-      skuEmbed.set_author(name='FRIDAY SKU Database', url='', icon_url=userPFP)
+      skuEmbed.set_author(name='FRIDAY SKU Database', url='')
       skuEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
       skuEmbed.add_field(name=f'SKUs ({numSKUs} stored):',
                          value="```" + skuString + "```")
-  
+      
       #if the user wants to keep their list private, they add True to the command, and the list is DMed to them.
       if private:
-          await user.send(embed=skuEmbed)
+          await author.send(embed=skuEmbed)
       else:
           await ctx.channel.send(embed=skuEmbed)
-  
   
   """this command is used to gather information about a provided footsite SKU. It will grab an image of
   the product, check to see if it is available on the site, see if the SKU is in the user's database,
@@ -249,6 +230,7 @@ class footsites(commands.Cog):
   
   
   @commands.command()
+  @commands.guild_only()
   async def infoSKU(self, ctx, sku=None):
       #catching obvious errors
       if sku == None:

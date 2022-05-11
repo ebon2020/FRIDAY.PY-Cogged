@@ -4,6 +4,9 @@ from nextcord.ext import commands
 from nextcord import Color as c
 import requests
 import json
+import csv
+import validators
+import pandas as pd
 
 error = c.red()
 affirm = c.green()
@@ -12,13 +15,42 @@ blue = c.blue()
 #keeping track of version number
 version = os.environ['Version']
 
+#universal shop user dest
+path_to_user_list = './ShopifyLists/userShopLists.csv'
+
+
+#commands
 shopCommands = {
-  'shopScrape <productLink>':'Scrape variants of a Shopify product.'
+  'shopScrape <productLink>':'Scrape variants of a Shopify product.',
+  'createShopList':'Create a serverside database of Shopify restock links.',
+  'addLink <link>':'Add a link to your serverside database.',
+  'delLink <link>':'Delete a link from your serverside database.',
+  'listLinks':'Returns the links stored in your database.'
 }
 
 #credits, version number and bot Icon
-webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#7550 | Shopify'
+webhookFooter = f'FRIDAY.PY v{version} | coded by ebon#2020 | Shopify'
 footerUrl = 'https://cdn.discordapp.com/attachments/884302303648153641/964942745892454430/FridayAI.jpg'
+
+#check for shop list
+def checkUserShopList(id, pathToUserList):
+    users = []
+    with open(pathToUserList, 'r') as userList:
+        for row in userList:
+            users.append(row)
+        for user in users:
+            if str(id) in user:
+                return True
+    userList.close()
+    return False
+
+def checkInList(pathToList, link):
+  linkedList = pd.read_csv(pathToList)
+  linkList = linkedList.links.tolist()
+  for storedLink in linkList:
+    if link in storedLink:
+      return True
+  return False
 
 async def sendErrorMessage(ctx, message, command_needed=False, command=None):
     #initiating the error embed
@@ -43,7 +75,7 @@ class shopify(commands.Cog):
 
   @commands.command()
   async def shopifyHelp(self,ctx):
-    helpEmbed = nextcord.Embed(title = 'NFT Help!', description = 'Commands in the NFT cog:')
+    helpEmbed = nextcord.Embed(title = 'Shopify Help!', description = 'Commands in the Shopify cog:')
     for command in shopCommands:
       helpEmbed.add_field(name = f'`*{command}`', value=f'{shopCommands[command]}')
     helpEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
@@ -129,5 +161,59 @@ class shopify(commands.Cog):
                   await sendErrorMessage(
                       ctx, 'Variants not loaded on Shopify JSON endpoint.')
 
+  @commands.command()
+  async def createShopList(self, ctx):
+    author = ctx.author
+    id = author.id
+
+    path_to_user_list = './ShopifyLists/userShopLists.csv'
+
+    if checkUserShopList(id, path_to_user_list):
+      await sendErrorMessage(ctx, f'{author}\'s database already exists!')
+    else:
+      path_to_user_shop_list = f'./ShopifyLists/{id}.csv'
+      with open(path_to_user_list,'a') as userList:
+        writer = csv.writer(userList)
+        writer.writerow([f'{id}'])
+      userList.close()
+      headerRow = ['links']
+      with open(path_to_user_shop_list,'w') as newUserList:
+        writer = csv.writer(newUserList)
+        writer.writerow(headerRow)
+      newUserList.close()
+
+      affirmEmbed = nextcord.Embed(
+              title=f'Database Created for user: `{author}`',
+              description='Run `*addLink` to start building your link list!',
+              color=affirm)
+      affirmEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+      await ctx.channel.send(embed=affirmEmbed)
+    
+  @commands.command()
+  async def addLink(self, ctx, link=None):
+    author = ctx.author
+    id = author.id
+    channel = ctx.channel
+    commandMessage = await channel.fetch_message(channel.last_message_id)
+    await commandMessage.edit(suppress=True)
+    
+    if link == None:
+      await sendErrorMessage(ctx,'No link provided', True, '*addLink <link>')
+    if checkUserShopList(id, path_to_user_list):
+      if validators.url(link):
+        path_to_user_shop_list = f'./ShopifyLists/{id}.csv'
+        if checkInList(path_to_user_shop_list, link):
+          await sendErrorMessage(ctx,'Link already stored.')
+        else:
+          with open(path_to_user_shop_list, 'a') as userList:
+            writer = csv.writer(userList)
+            writer.writerow([f"{link}"])
+          userList.close()
+          linkAddedEmbed = nextcord.Embed(title='Success!', description=f'[New link]({link}) added to `{author}`\'s link list!', color=affirm)
+          linkAddedEmbed.set_footer(text=webhookFooter, icon_url=footerUrl)
+          await ctx.send(embed=linkAddedEmbed)
+      else:
+        await sendErrorMessage(ctx,'Link not valid.')
+        
 def setup(client):
   client.add_cog(shopify(client))
